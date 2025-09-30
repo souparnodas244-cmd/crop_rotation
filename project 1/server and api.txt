@@ -1,0 +1,658 @@
+// server.js - Main Backend Server for Global Agri-Intel
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const axios = require('axios');
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/agri-intel', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+// ============= SCHEMAS & MODELS =============
+
+// User Schema
+const userSchema = new mongoose.Schema({
+    fullName: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true },
+    password: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    lastLogin: { type: Date },
+    preferences: {
+        language: { type: String, default: 'en' },
+        units: { type: String, default: 'metric' }
+    }
+});
+
+// Farm Data Schema
+const farmSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    location: { type: String, required: true },
+    coordinates: {
+        lat: Number,
+        lng: Number
+    },
+    landSize: { type: Number, required: true },
+    soilType: { type: String, required: true },
+    waterAvailability: { type: String, enum: ['high', 'medium', 'low'], required: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Sensor Data Schema
+const sensorDataSchema = new mongoose.Schema({
+    farmId: { type: mongoose.Schema.Types.ObjectId, ref: 'Farm' },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    timestamp: { type: Date, default: Date.now },
+    data: {
+        soilPH: { type: Number, min: 0, max: 14 },
+        moisture: { type: Number, min: 0, max: 100 },
+        nitrogen: { type: Number, min: 0 },
+        phosphorus: { type: Number, min: 0 },
+        potassium: { type: Number, min: 0 },
+        temperature: { type: Number },
+        humidity: { type: Number, min: 0, max: 100 }
+    }
+});
+
+// Crop Recommendation Schema
+const recommendationSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    farmId: { type: mongoose.Schema.Types.ObjectId, ref: 'Farm' },
+    timestamp: { type: Date, default: Date.now },
+    inputData: {
+        location: String,
+        soilType: String,
+        waterAvailability: String,
+        sensorData: Object
+    },
+    recommendations: [{
+        cropName: String,
+        suitability: Number,
+        expectedYield: String,
+        profitEstimate: String,
+        waterRequirement: String,
+        seasonalAdvice: String,
+        marketPrice: Number,
+        rank: Number
+    }],
+    weatherData: Object
+});
+
+// Models
+const User = mongoose.model('User', userSchema);
+const Farm = mongoose.model('Farm', farmSchema);
+const SensorData = mongoose.model('SensorData', sensorDataSchema);
+const Recommendation = mongoose.model('Recommendation', recommendationSchema);
+
+// ============= AUTHENTICATION MIDDLEWARE =============
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+        if (err) return res.status(403).json({ error: 'Invalid token' });
+        req.user = user;
+        next();
+    });
+};
+
+// ============= CROP RECOMMENDATION ENGINE =============
+class CropRecommendationEngine {
+    constructor() {
+        this.cropDatabase = {
+            rice: {
+                name: "Rice",
+                optimalPH: { min: 6.0, max: 7.5 },
+                optimalMoisture: { min: 70, max: 90 },
+                waterReq: "High",
+                temperature: { min: 20, max: 35 },
+                soilTypes: ['clay', 'loamy', 'silty'],
+                npkRatio: { n: 120, p: 60, k: 60 }
+            },
+            wheat: {
+                name: "Wheat",
+                optimalPH: { min: 6.0, max: 7.0 },
+                optimalMoisture: { min: 40, max: 60 },
+                waterReq: "Medium",
+                temperature: { min: 10, max: 25 },
+                soilTypes: ['loamy', 'clay', 'sandy'],
+                npkRatio: { n: 100, p: 50, k: 50 }
+            },
+            maize: {
+                name: "Maize (Corn)",
+                optimalPH: { min: 5.8, max: 7.0 },
+                optimalMoisture: { min: 50, max: 70 },
+                waterReq: "Medium",
+                temperature: { min: 18, max: 32 },
+                soilTypes: ['loamy', 'sandy', 'red'],
+                npkRatio: { n: 150, p: 60, k: 40 }
+            },
+            soybeans: {
+                name: "Soybeans",
+                optimalPH: { min: 6.0, max: 7.0 },
+                optimalMoisture: { min: 45, max: 65 },
+                waterReq: "Medium",
+                temperature: { min: 20, max: 30 },
+                soilTypes: ['loamy', 'clay', 'black'],
+                npkRatio: { n: 20, p: 80, k: 40 }
+            },
+            potatoes: {
+                name: "Potatoes",
+                optimalPH: { min: 5.0, max: 6.5 },
+                optimalMoisture: { min: 60, max: 80 },
+                waterReq: "Medium",
+                temperature: { min: 15, max: 20 },
+                soilTypes: ['loamy', 'sandy', 'red'],
+                npkRatio: { n: 120, p: 80, k: 120 }
+            },
+            tomatoes: {
+                name: "Tomatoes",
+                optimalPH: { min: 6.0, max: 6.8 },
+                optimalMoisture: { min: 60, max: 70 },
+                waterReq: "Medium",
+                temperature: { min: 20, max: 30 },
+                soilTypes: ['loamy', 'sandy', 'red'],
+                npkRatio: { n: 100, p: 70, k: 70 }
+            },
+            cotton: {
+                name: "Cotton",
+                optimalPH: { min: 5.8, max: 8.0 },
+                optimalMoisture: { min: 35, max: 55 },
+                waterReq: "Low",
+                temperature: { min: 20, max: 30 },
+                soilTypes: ['black', 'red', 'loamy'],
+                npkRatio: { n: 120, p: 60, k: 60 }
+            },
+            sugarcane: {
+                name: "Sugarcane",
+                optimalPH: { min: 6.0, max: 7.5 },
+                optimalMoisture: { min: 70, max: 85 },
+                waterReq: "High",
+                temperature: { min: 25, max: 35 },
+                soilTypes: ['loamy', 'clay', 'red'],
+                npkRatio: { n: 200, p: 60, k: 100 }
+            }
+        };
+
+        this.marketPrices = {
+            rice: { price: 450, trend: 'up', yield: '8-10 tonnes/ha', profit: '$2,000/ha' },
+            wheat: { price: 220, trend: 'stable', yield: '6-8 tonnes/ha', profit: '$1,500/ha' },
+            maize: { price: 175, trend: 'down', yield: '10-12 tonnes/ha', profit: '$2,200/ha' },
+            soybeans: { price: 480, trend: 'up', yield: '3-4 tonnes/ha', profit: '$1,800/ha' },
+            potatoes: { price: 300, trend: 'up', yield: '40-50 tonnes/ha', profit: '$4,000/ha' },
+            tomatoes: { price: 800, trend: 'stable', yield: '80-100 tonnes/ha', profit: '$6,000/ha' },
+            cotton: { price: 1800, trend: 'up', yield: '2-3 tonnes/ha', profit: '$3,500/ha' },
+            sugarcane: { price: 35, trend: 'stable', yield: '70-100 tonnes/ha', profit: '$2,500/ha' }
+        };
+    }
+
+    calculateSuitability(crop, inputData) {
+        let score = 100;
+        const { sensorData, soilType, waterAvailability, weatherData } = inputData;
+
+        // pH Score (25%)
+        if (sensorData?.soilPH) {
+            const ph = sensorData.soilPH;
+            if (ph < crop.optimalPH.min || ph > crop.optimalPH.max) {
+                const deviation = Math.min(
+                    Math.abs(ph - crop.optimalPH.min),
+                    Math.abs(ph - crop.optimalPH.max)
+                );
+                score -= Math.min(25, deviation * 5);
+            }
+        }
+
+        // Moisture Score (20%)
+        if (sensorData?.moisture) {
+            const moisture = sensorData.moisture;
+            if (moisture < crop.optimalMoisture.min) {
+                score -= Math.min(20, (crop.optimalMoisture.min - moisture) * 0.5);
+            } else if (moisture > crop.optimalMoisture.max) {
+                score -= Math.min(20, (moisture - crop.optimalMoisture.max) * 0.5);
+            }
+        }
+
+        // Soil Type Score (20%)
+        if (soilType && !crop.soilTypes.includes(soilType)) {
+            score -= 20;
+        }
+
+        // Water Availability Score (20%)
+        if (waterAvailability) {
+            if (crop.waterReq === 'High' && waterAvailability === 'low') score -= 30;
+            else if (crop.waterReq === 'High' && waterAvailability === 'medium') score -= 10;
+            else if (crop.waterReq === 'Medium' && waterAvailability === 'low') score -= 15;
+        }
+
+        // Temperature Score (15%)
+        if (weatherData?.temp) {
+            const temp = weatherData.temp;
+            if (temp < crop.temperature.min || temp > crop.temperature.max) {
+                const deviation = Math.min(
+                    Math.abs(temp - crop.temperature.min),
+                    Math.abs(temp - crop.temperature.max)
+                );
+                score -= Math.min(15, deviation * 1.5);
+            }
+        }
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    generateRecommendations(inputData) {
+        const recommendations = [];
+
+        for (const [cropKey, crop] of Object.entries(this.cropDatabase)) {
+            const suitability = this.calculateSuitability(crop, inputData);
+            const marketData = this.marketPrices[cropKey];
+
+            recommendations.push({
+                cropName: crop.name,
+                suitability: suitability,
+                expectedYield: marketData.yield,
+                profitEstimate: marketData.profit,
+                waterRequirement: crop.waterReq,
+                seasonalAdvice: this.getSeasonalAdvice(crop, inputData.weatherData),
+                marketPrice: marketData.price,
+                trend: marketData.trend
+            });
+        }
+
+        // Sort by suitability and add rank
+        recommendations.sort((a, b) => b.suitability - a.suitability);
+        recommendations.forEach((rec, index) => {
+            rec.rank = index + 1;
+        });
+
+        return recommendations.slice(0, 5); // Return top 5 recommendations
+    }
+
+    getSeasonalAdvice(crop, weatherData) {
+        const month = new Date().getMonth();
+        const season = month >= 3 && month <= 5 ? 'summer' :
+                      month >= 6 && month <= 8 ? 'monsoon' :
+                      month >= 9 && month <= 11 ? 'autumn' : 'winter';
+
+        const advice = {
+            summer: "Ensure adequate irrigation and consider mulching to retain moisture.",
+            monsoon: "Monitor for fungal diseases and ensure proper drainage.",
+            autumn: "Ideal for planting winter crops. Prepare soil with organic matter.",
+            winter: "Protect from frost if needed. Consider greenhouse cultivation for sensitive crops."
+        };
+
+        return advice[season];
+    }
+}
+
+// ============= API ROUTES =============
+
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date() });
+});
+
+// User Registration
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { fullName, email, password } = req.body;
+
+        // Validate input
+        if (!fullName || !email || !password) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Check if user exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create user
+        const user = new User({
+            fullName,
+            email,
+            password: hashedPassword
+        });
+
+        await user.save();
+
+        res.status(201).json({
+            message: 'User created successfully',
+            userId: user._id
+        });
+    } catch (error) {
+        console.error('Signup error:', error);
+        res.status(500).json({ error: 'Server error during signup' });
+    }
+});
+
+// User Login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Check password
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Update last login
+        user.lastLogin = new Date();
+        await user.save();
+
+        // Generate token
+        const token = jwt.sign(
+            { userId: user._id, email: user.email },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            token,
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                preferences: user.preferences
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Server error during login' });
+    }
+});
+
+// Get Weather Data
+app.get('/api/weather/:location', authenticateToken, async (req, res) => {
+    try {
+        const { location } = req.params;
+        
+        // Using OpenWeatherMap API (you'll need to get an API key)
+        const apiKey = process.env.OPENWEATHER_API_KEY || 'your-api-key';
+        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${location}&appid=${apiKey}&units=metric`;
+        
+        // For demo purposes, returning mock data if API key not configured
+        if (apiKey === 'your-api-key') {
+            return res.json({
+                location: location,
+                temp: 22 + Math.random() * 10,
+                humidity: 60 + Math.random() * 20,
+                description: 'Partly Cloudy',
+                wind: 10 + Math.random() * 5,
+                pressure: 1010 + Math.random() * 10
+            });
+        }
+
+        const response = await axios.get(weatherUrl);
+        const data = response.data;
+
+        res.json({
+            location: data.name,
+            temp: data.main.temp,
+            humidity: data.main.humidity,
+            description: data.weather[0].description,
+            wind: data.wind.speed,
+            pressure: data.main.pressure
+        });
+    } catch (error) {
+        console.error('Weather API error:', error);
+        // Return mock data as fallback
+        res.json({
+            location: req.params.location,
+            temp: 25,
+            humidity: 65,
+            description: 'Clear sky',
+            wind: 12,
+            pressure: 1013
+        });
+    }
+});
+
+// Save Farm Data
+app.post('/api/farm', authenticateToken, async (req, res) => {
+    try {
+        const { location, landSize, soilType, waterAvailability, coordinates } = req.body;
+        
+        const farm = new Farm({
+            userId: req.user.userId,
+            location,
+            landSize,
+            soilType,
+            waterAvailability,
+            coordinates
+        });
+
+        await farm.save();
+        res.status(201).json(farm);
+    } catch (error) {
+        console.error('Farm save error:', error);
+        res.status(500).json({ error: 'Error saving farm data' });
+    }
+});
+
+// Get User's Farms
+app.get('/api/farms', authenticateToken, async (req, res) => {
+    try {
+        const farms = await Farm.find({ userId: req.user.userId });
+        res.json(farms);
+    } catch (error) {
+        console.error('Farm fetch error:', error);
+        res.status(500).json({ error: 'Error fetching farms' });
+    }
+});
+
+// Save Sensor Data
+app.post('/api/sensor-data', authenticateToken, async (req, res) => {
+    try {
+        const sensorData = new SensorData({
+            userId: req.user.userId,
+            farmId: req.body.farmId,
+            data: req.body.data
+        });
+
+        await sensorData.save();
+        res.status(201).json(sensorData);
+    } catch (error) {
+        console.error('Sensor data save error:', error);
+        res.status(500).json({ error: 'Error saving sensor data' });
+    }
+});
+
+// Get Latest Sensor Data
+app.get('/api/sensor-data/latest', authenticateToken, async (req, res) => {
+    try {
+        const latestData = await SensorData.findOne({ userId: req.user.userId })
+            .sort({ timestamp: -1 });
+        
+        if (!latestData) {
+            // Return mock sensor data if none exists
+            return res.json({
+                data: {
+                    soilPH: 6.5 + Math.random() * 1,
+                    moisture: 50 + Math.random() * 30,
+                    nitrogen: 60 + Math.random() * 40,
+                    phosphorus: 40 + Math.random() * 20,
+                    potassium: 30 + Math.random() * 20,
+                    temperature: 20 + Math.random() * 10,
+                    humidity: 60 + Math.random() * 20
+                },
+                timestamp: new Date()
+            });
+        }
+        
+        res.json(latestData);
+    } catch (error) {
+        console.error('Sensor data fetch error:', error);
+        res.status(500).json({ error: 'Error fetching sensor data' });
+    }
+});
+
+// Get Crop Recommendations
+app.post('/api/recommendations', authenticateToken, async (req, res) => {
+    try {
+        const { location, landSize, soilType, waterAvailability, sensorData } = req.body;
+        
+        // Get weather data for location
+        let weatherData = { temp: 25, humidity: 65 }; // Default values
+        try {
+            const weatherResponse = await axios.get(`http://localhost:${PORT}/api/weather/${location}`, {
+                headers: { Authorization: req.headers.authorization }
+            });
+            weatherData = weatherResponse.data;
+        } catch (error) {
+            console.log('Using default weather data');
+        }
+
+        // Generate recommendations
+        const engine = new CropRecommendationEngine();
+        const recommendations = engine.generateRecommendations({
+            sensorData,
+            soilType,
+            waterAvailability,
+            weatherData
+        });
+
+        // Save recommendation to database
+        const recommendationRecord = new Recommendation({
+            userId: req.user.userId,
+            inputData: {
+                location,
+                soilType,
+                waterAvailability,
+                sensorData
+            },
+            recommendations,
+            weatherData
+        });
+
+        await recommendationRecord.save();
+
+        res.json({
+            recommendations,
+            weatherData,
+            recommendationId: recommendationRecord._id
+        });
+    } catch (error) {
+        console.error('Recommendation error:', error);
+        res.status(500).json({ error: 'Error generating recommendations' });
+    }
+});
+
+// Get Market Prices
+app.get('/api/market-prices', authenticateToken, async (req, res) => {
+    try {
+        // In production, this would fetch from a real market data API
+        const marketData = [
+            { name: "Wheat", price: 220, trend: "up", change: 2.5 },
+            { name: "Rice", price: 450, trend: "up", change: 3.1 },
+            { name: "Maize", price: 175, trend: "down", change: -1.2 },
+            { name: "Soybeans", price: 480, trend: "up", change: 4.5 },
+            { name: "Cotton", price: 1800, trend: "stable", change: 0.3 },
+            { name: "Potatoes", price: 300, trend: "up", change: 1.8 }
+        ];
+
+        res.json(marketData);
+    } catch (error) {
+        console.error('Market price error:', error);
+        res.status(500).json({ error: 'Error fetching market prices' });
+    }
+});
+
+// Get User's Recommendation History
+app.get('/api/recommendations/history', authenticateToken, async (req, res) => {
+    try {
+        const history = await Recommendation.find({ userId: req.user.userId })
+            .sort({ timestamp: -1 })
+            .limit(10);
+        
+        res.json(history);
+    } catch (error) {
+        console.error('History fetch error:', error);
+        res.status(500).json({ error: 'Error fetching recommendation history' });
+    }
+});
+
+// Update User Preferences
+app.patch('/api/user/preferences', authenticateToken, async (req, res) => {
+    try {
+        const { language, units } = req.body;
+        
+        const user = await User.findByIdAndUpdate(
+            req.user.userId,
+            { 
+                $set: { 
+                    'preferences.language': language,
+                    'preferences.units': units 
+                }
+            },
+            { new: true }
+        );
+
+        res.json({
+            message: 'Preferences updated',
+            preferences: user.preferences
+        });
+    } catch (error) {
+        console.error('Preference update error:', error);
+        res.status(500).json({ error: 'Error updating preferences' });
+    }
+});
+
+// Analytics Endpoint
+app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        
+        // Get user's statistics
+        const [farmCount, recommendationCount, lastRecommendation] = await Promise.all([
+            Farm.countDocuments({ userId }),
+            Recommendation.countDocuments({ userId }),
+            Recommendation.findOne({ userId }).sort({ timestamp: -1 })
+        ]);
+
+        res.json({
+            farmCount,
+            recommendationCount,
+            lastRecommendation: lastRecommendation ? lastRecommendation.timestamp : null,
+            memberSince: req.user.createdAt
+        });
+    } catch (error) {
+        console.error('Analytics error:', error);
+        res.status(500).json({ error: 'Error fetching analytics' });
+    }
+});
+
+// Start Server
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});

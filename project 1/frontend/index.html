@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - Global Agri-Intel</title>
+    <link rel="stylesheet" href="auth.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-white, #fff);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 20px;
+            transition: opacity 0.8s ease-out, visibility 0.8s ease-out;
+            opacity: 1;
+        }
+        #splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .splash-title {
+            font-size: 2em;
+            color: var(--text-dark, #2c3e50);
+            opacity: 0;
+            animation: fadeInText 1s 1.5s ease-out forwards;
+        }
+        .auth-container.hidden-initially {
+            opacity: 0;
+            transition: opacity 0.8s ease-in;
+        }
+        .auth-container.visible {
+            opacity: 1;
+        }
+
+        @keyframes grow-leaf { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes draw-line { to { stroke-dashoffset: 0; } }
+        @keyframes unfold-leaf { 0% { transform: scaleY(0); opacity: 0; } 100% { transform: scaleY(1); opacity: 1; } }
+        @keyframes fadeInText { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <svg class="leaf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="animation: grow-leaf 2s ease-in-out forwards;">
+            <path class="stem" d="M50 95 V40" stroke-width="3" fill="none" style="stroke:var(--primary-dark, #204020); stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-line 1s 0.5s ease-out forwards;"/>
+            <path class="leaf" d="M50,40 C10,40 20,10 50,5 C80,10 90,40 50,40 Z" style="fill:var(--primary-color, #4CAF50); transform-origin: bottom center; animation: unfold-leaf 1.2s 1s ease-out forwards; opacity: 0;"/>
+        </svg>
+        <h1 class="splash-title">Global Agri-Intel</h1>
+    </div>
+    
+    <div class="auth-container hidden-initially">
+        <div class="auth-header">
+            <svg class="leaf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50,40 C10,40 20,10 50,5 C80,10 90,40 50,40 Z" fill="var(--primary-color, #4CAF50)"/>
+            </svg>
+            <h1>Welcome Back!</h1>
+            <p>Please log in to access your dashboard.</p>
+        </div>
+        <form class="auth-form" action="dashboard.html">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="signup.html">Sign Up</a></p>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            const splash = document.getElementById('splash-screen');
+            const authContainer = document.querySelector('.auth-container');
+
+            setTimeout(() => {
+                if (splash) {
+                    splash.classList.add('hidden');
+                }
+                if (authContainer) {
+                    authContainer.classList.remove('hidden-initially');
+                    authContainer.classList.add('visible');
+                }
+            }, 2500); // The splash screen will be visible for 2.5 seconds
+        });
+    </script>
+
+</body>
+</html>

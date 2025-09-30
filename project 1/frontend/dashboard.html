@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Global Agri-Intel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4CAF50; /* Lighter, more vibrant Green */
+            --primary-dark: #388E3C;
+            --secondary-color: #3498db;
+            --text-dark: #2c3e50;
+            --text-light: #7f8c8d;
+            --bg-light: #f4f7f6;
+            --bg-white: #ffffff;
+            --border-color: #e0e0e0;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+            --border-radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background: var(--bg-light); min-height: 100vh; padding: 20px; color: var(--text-dark); }
+        
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-white); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 20px; transition: opacity 0.8s ease-out, visibility 0.8s ease-out; opacity: 1; }
+        #splash-screen.hidden { opacity: 0; visibility: hidden; }
+        .leaf-icon { width: 80px; height: 80px; animation: grow-leaf 2s ease-in-out forwards; }
+        .leaf-icon .stem { stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-line 1s 0.5s ease-out forwards; stroke: var(--primary-dark); }
+        .leaf-icon .leaf { transform-origin: bottom center; animation: unfold-leaf 1.2s 1s ease-out forwards; opacity: 0; fill: var(--primary-color); }
+        .splash-title { font-size: 2em; color: var(--text-dark); opacity: 0; animation: fadeInText 1s 1.5s ease-out forwards; }
+
+        .container { max-width: 1400px; margin: 0 auto; background: var(--bg-white); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+        header { background-image: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); padding: 40px 30px; text-align: center; color: white; position: relative; }
+        
+        .header-top-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logout-link a { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 8px 20px; border-radius: var(--border-radius); text-decoration: none; font-weight: 500; transition: all 0.3s ease; }
+        .logout-link a:hover { background: rgba(255, 255, 255, 0.25); transform: scale(1.05); display: inline-block; }
+        .language-selector { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--border-radius); padding: 8px 15px; color: white; cursor: pointer; transition: all 0.3s ease; background-color: var(--primary-dark); }
+        
+        header h1 { font-size: 2.8em; font-weight: 700; margin-bottom: 10px; padding-top: 40px; }
+        .subtitle { font-size: 1.2em; opacity: 0.9; }
+        
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; padding: 30px; }
+        .section-title { font-size: 1.8em; font-weight: 600; color: var(--text-dark); margin-bottom: 25px; padding-bottom: 10px; border-bottom: 3px solid var(--primary-color); display: inline-block; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
+        input, select { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius); font-size: 16px; font-family: 'Poppins', sans-serif; transition: all 0.3s ease; background: #fafafa; }
+        input:focus, select:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2); background: var(--bg-white); }
+        .btn { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: 500; border-radius: var(--border-radius); cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2); }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3); }
+        
+        .sensor-data { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+        .sensor-card { background: var(--bg-white); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--border-radius); text-align: center; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .sensor-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
+        .sensor-value { font-size: 2em; font-weight: 600; color: var(--primary-dark); margin: 5px 0; }
+        .sensor-label { color: var(--text-light); font-weight: 500; }
+        .sensor-status { color: var(--primary-color); font-weight: 500; }
+        
+        .recommendation-card { background: var(--bg-white); border-radius: var(--border-radius); padding: 25px; margin-bottom: 20px; border-left: 5px solid; box-shadow: var(--shadow); transition: transform 0.3s ease; animation: fadeInUp 0.5s ease; }
+        .crop-name { font-size: 1.6em; color: var(--text-dark); margin-bottom: 15px; font-weight: 600; }
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .metric { padding: 12px; background: var(--bg-light); border-radius: 8px; }
+        .metric span { display: block; }
+        .metric span:first-child { color: var(--text-light); font-size: 0.9em; }
+        .metric span:last-child { font-weight: 600; color: var(--text-dark); font-size: 1.1em; }
+        .suitability-bar { width: 100%; background: var(--border-color); border-radius: 5px; height: 10px; margin-top: 5px; overflow: hidden; }
+        .suitability-progress { height: 100%; background: var(--primary-color); border-radius: 5px; }
+        .weather-widget { background: linear-gradient(135deg, #74b9ff, #0984e3); color: white; padding: 20px; border-radius: var(--border-radius); margin-bottom: 25px; text-align: center; }
+        .weather-temp { font-size: 3em; margin: 10px 0; font-weight: 600; }
+        .market-trends { background: var(--bg-white); padding: 20px; border-radius: var(--border-radius); margin-top: 25px; box-shadow: var(--shadow); }
+        .loading { text-align: center; padding: 40px 20px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+        
+        @keyframes grow-leaf { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes draw-line { to { stroke-dashoffset: 0; } }
+        @keyframes unfold-leaf { 0% { transform: scaleY(0); opacity: 0; } 100% { transform: scaleY(1); opacity: 1; } }
+        @keyframes fadeInText { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (max-width: 992px) { .main-content { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { header h1 { font-size: 2.2em; padding-top: 50px; } }
+    </style>
+</head>
+<body>
+    <div id="splash-screen">
+        <svg class="leaf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path class="stem" d="M50 95 V40" stroke-width="3" fill="none"/>
+            <path class="leaf" d="M50,40 C10,40 20,10 50,5 C80,10 90,40 50,40 Z"/>
+        </svg>
+        <h1 class="splash-title">Global Agri-Intel</h1>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="header-top-bar">
+                <div class="logout-link"><a href="index.html">Logout</a></div>
+                <select class="language-selector" id="langSelect" onchange="changeLanguage()">
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                </select>
+            </div>
+            <h1 id="mainTitle">🌾 AI Crop Recommendation System</h1>
+            <p class="subtitle" id="subtitle">Your Global Partner in Smart Farming</p>
+        </header>
+        <div class="main-content">
+            <div class="input-section">
+                <h2 class="section-title" id="inputTitle">Farm Input Data</h2>
+                <div class="weather-widget">
+                    <div id="weatherLocation">Global Data</div>
+                    <div class="weather-temp" id="weatherTemp">--°C</div>
+                    <div id="weatherDesc">Enter location for weather data</div>
+                </div>
+                
+                <div class="sensor-data">
+                    <div class="sensor-card">
+                        <div class="sensor-label">Soil pH</div>
+                        <div class="sensor-value" id="phValue">--</div>
+                        <div class="sensor-status" id="phStatus">Awaiting Data</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label">Moisture</div>
+                        <div class="sensor-value" id="moistureValue">--%</div>
+                        <div class="sensor-status" id="moistureStatus">Awaiting Data</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label">NPK Ratio</div>
+                        <div class="sensor-value" id="npkValue">--</div>
+                        <div class="sensor-status" id="npkStatus">Awaiting Data</div>
+                    </div>
+                </div>
+
+                <form id="farmForm">
+                    <div class="form-group"><label for="location">Location</label><input type="text" id="location" placeholder="e.g., Napa Valley, USA"></div>
+                    <div class="form-group"><label for="landSize">Land Size (Acres)</label><input type="number" id="landSize" value="2.5"></div>
+                    <div class="form-group">
+                        <label for="soilType">Soil Type</label>
+                        <select id="soilType">
+                            <option value="loamy">Loamy</option>
+                            <option value="clay">Clay</option>
+                            <option value="sandy">Sandy</option>
+                            <option value="silty">Silty</option>
+                            <option value="peaty">Peaty</option>
+                            <option value="chalky">Chalky</option>
+                            <option value="red">Red Soil</option>
+                            <option value="black">Black Soil</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label for="waterAvailability">Water</label><select id="waterAvailability"><option value="high">High (Irrigation)</option><option value="medium">Medium (Seasonal)</option><option value="low">Low (Rain-fed)</option></select></div>
+                    <button type="button" class="btn" onclick="getRecommendations()">Get Recommendations</button>
+                </form>
+            </div>
+            <div class="results-section">
+                <h2 class="section-title" id="resultsTitle">Crop Recommendations</h2>
+                <div id="recommendationsContainer"><p style="padding: 20px; color: var(--text-light); text-align: center;">Please enter your location and farm details to generate personalized recommendations.</p></div>
+                <div class="market-trends"><h3 id="marketTitle">Global Market Trends</h3><div id="marketData"></div></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // --- COMPLETE AND CORRECTED JAVASCRIPT ---
+
+        // --- Data Objects ---
+        const translations = { 
+            en: { mainTitle: "🌾 AI Crop Recommendation System", subtitle: "Your Global Partner in Smart Farming"}, 
+            es: { mainTitle: "🌾 Sistema de Recomendación de Cultivos", subtitle: "Su Socio Global en Agricultura Inteligente"},
+            fr: { mainTitle: "🌾 Système de Recommandation de Cultures", subtitle: "Votre Partenaire Mondial en Agriculture Intelligente"} 
+        };
+        const cropDatabase = { 
+            rice: { name: "Rice", suitability: 95, yield: "8-10 tonnes/ha", profit: "$2,000/ha", waterReq: "High" }, 
+            wheat: { name: "Wheat", suitability: 88, yield: "6-8 tonnes/ha", profit: "$1,500/ha", waterReq: "Medium" }, 
+            maize: { name: "Maize (Corn)", suitability: 92, yield: "10-12 tonnes/ha", profit: "$2,200/ha", waterReq: "Medium" }, 
+            soybeans: { name: "Soybeans", suitability: 90, yield: "3-4 tonnes/ha", profit: "$1,800/ha", waterReq: "Medium" }, 
+            potatoes: { name: "Potatoes", suitability: 85, yield: "40-50 tonnes/ha", profit: "$4,000/ha", waterReq: "Medium" } 
+        };
+        const marketData = [ 
+            { name: "Wheat", price: 220, trend: "up" }, 
+            { name: "Maize", price: 175, trend: "down" }, 
+            { name: "Soybeans", price: 480, trend: "up" } 
+        ];
+        
+        // --- Core Functions ---
+        function changeLanguage() {
+            const lang = document.getElementById('langSelect').value;
+            const trans = translations[lang] || translations.en;
+            Object.keys(trans).forEach(key => {
+                const el = document.getElementById(key);
+                if(el) el.textContent = trans[key];
+            });
+        }
+        
+        function populateMarketTrends() {
+            const container = document.getElementById('marketData');
+            if(container) {
+                container.innerHTML = marketData.map(item => `
+                    <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
+                        <span>${item.name}</span>
+                        <span style="color: ${item.trend === 'up' ? 'var(--primary-dark)' : '#e74c3c'}; font-weight: 500;">
+                            ${item.trend === 'up' ? '↑' : '↓'} $${item.price}/tonne
+                        </span>
+                    </div>`).join('');
+            }
+        }
+        
+        function getRecommendations() {
+            const locationInput = document.getElementById('location');
+            if (!locationInput.value) {
+                alert("Please enter a location.");
+                return;
+            }
+            
+            // Simulate fetching data for the new location
+            document.getElementById('weatherLocation').textContent = locationInput.value;
+            document.getElementById('weatherTemp').textContent = `${(Math.random() * 20 + 10).toFixed(0)}°C`;
+            document.getElementById('weatherDesc').textContent = 'Partly Cloudy';
+            document.getElementById('phValue').textContent = (5.5 + Math.random() * 2).toFixed(1);
+            document.getElementById('phStatus').textContent = 'Optimal';
+            document.getElementById('moistureValue').textContent = `${(30 + Math.random() * 40).toFixed(0)}%`;
+            document.getElementById('moistureStatus').textContent = 'Good';
+            document.getElementById('npkValue').textContent = `${Math.floor(Math.random()*50+60)}-${Math.floor(Math.random()*20+40)}-${Math.floor(Math.random()*20+30)}`;
+            document.getElementById('npkStatus').textContent = 'Balanced';
+
+            const container = document.getElementById('recommendationsContainer');
+            container.innerHTML = `<div class="loading"><div class="spinner"></div><p>Analyzing global data...</p></div>`;
+            
+            setTimeout(() => {
+                const water = document.getElementById('waterAvailability').value;
+                let recs = Object.values(cropDatabase).map(c => {
+                    let score = c.suitability;
+                    if (water === 'low' && c.waterReq === 'High') {
+                        score -= 30;
+                    }
+                    return { ...c, score: Math.max(20, score) };
+                }).sort((a,b) => b.score - a.score);
+                
+                container.innerHTML = recs.slice(0, 3).map((crop, index) => createRecommendationCard(crop, index + 1)).join('');
+            }, 1500);
+        }
+
+        function createRecommendationCard(crop, rank) {
+            const emoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+            const borderColors = ['#4CAF50', '#2196F3', '#FFC107'];
+            const dynamicBorderColor = borderColors[(rank - 1) % borderColors.length];
+            
+            return `
+                <div class="recommendation-card" style="border-left-color: ${dynamicBorderColor};">
+                    <div class="crop-name">${emoji} ${crop.name}</div>
+                    <div class="metric">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Suitability</span>
+                            <span>${crop.score}%</span>
+                        </div>
+                        <div class="suitability-bar">
+                            <div class="suitability-progress" style="width:${crop.score}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric-grid">
+                        <div class="metric">
+                            <span>Expected Yield</span>
+                            <span>${crop.yield}</span>
+                        </div>
+                        <div class="metric">
+                            <span>Profit Estimate</span>
+                            <span>${crop.profit}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('load', () => {
+            const splash = document.getElementById('splash-screen');
+            setTimeout(() => {
+                if(splash) {
+                    splash.classList.add('hidden');
+                }
+            }, 2500);
+            
+            populateMarketTrends();
+        });
+    </script>
+</body>
+</html>

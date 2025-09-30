@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Agri-Intel</title>
+    <link rel="stylesheet" href="auth.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>Create Your Account</h1>
+            <p>Join our smart farming community today.</p>
+        </div>
+        <form class="auth-form" id="signupForm">
+            <div class="form-group">
+                <label for="fullname">Full Name</label>
+                <input type="text" id="fullname" placeholder="Enter your full name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Create a strong password" required>
+            </div>
+            <button type="submit" class="btn">Create Account</button>
+        </form>
+        <div class="auth-footer">
+            <p>Already have an account? <a href="index.html">Login</a></p>
+        </div>
+    </div>
+    <script>
+        document.getElementById('signupForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const fullName = document.getElementById('fullname').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            try {
+                const response = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fullName, email, password }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Signup successful! Please log in.');
+                    window.location.href = 'index.html'; // Redirect to login page
+                } else {
+                    alert(`Signup failed: ${result.error || result.errors[0].msg}`);
+                }
+            } catch (error) {
+                alert('An error occurred during signup. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>

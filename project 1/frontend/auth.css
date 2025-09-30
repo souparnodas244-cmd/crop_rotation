@@ -1,0 +1,156 @@
+/* --- Root Variables for Emerald Theme --- */
+:root {
+    --primary-color: #008A62; /* Emerald Green */
+    --primary-dark: #006B4D;  /* Darker Emerald for gradients/accents */
+    --secondary-color: #3498db; /* Default blue for other accents if needed */
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f4f7f6;
+    --bg-white: #ffffff;
+    --border-color: #e0e0e0;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+    --border-radius: 12px;
+}
+
+/* --- Base Styles --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--bg-light);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    color: var(--text-dark);
+}
+
+/* --- Auth Container (Login/Signup Box) --- */
+.auth-container {
+    background: var(--bg-white);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 40px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    transform: translateY(0); /* Ensure no initial translateY */
+}
+
+.auth-header {
+    margin-bottom: 30px;
+}
+
+.auth-header .leaf-icon {
+    width: 60px;
+    height: 60px;
+    fill: var(--primary-color); /* Emerald leaf icon */
+    margin: 0 auto 15px;
+    display: block; /* Center the SVG */
+}
+
+.auth-header h1 {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: var(--primary-dark); /* Use darker emerald for heading */
+    margin-bottom: 10px;
+}
+
+.auth-header p {
+    color: var(--text-light);
+    font-size: 0.95em;
+}
+
+/* --- Form Styles --- */
+.form-group {
+    margin-bottom: 25px;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: 500;
+    font-size: 0.95em;
+}
+
+input[type="email"],
+input[type="password"],
+input[type="text"] {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 16px;
+    font-family: 'Poppins', sans-serif;
+    transition: all 0.3s ease;
+    background: #fafafa;
+}
+
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color); /* Emerald border on focus */
+    box-shadow: 0 0 0 3px rgba(0, 138, 98, 0.2); /* Emerald glow on focus */
+    background: var(--bg-white);
+}
+
+.btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); /* Emerald gradient button */
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 18px;
+    font-weight: 500;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    box-shadow: 0 4px 15px rgba(0, 138, 98, 0.2); /* Emerald button shadow */
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 138, 98, 0.3); /* Enhanced emerald shadow on hover */
+}
+
+/* --- Auth Footer --- */
+.auth-footer {
+    margin-top: 30px;
+    font-size: 0.9em;
+    color: var(--text-light);
+}
+
+.auth-footer a {
+    color: var(--primary-color); /* Emerald link color */
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.auth-footer a:hover {
+    color: var(--primary-dark); /* Darker emerald on link hover */
+    text-decoration: underline;
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 600px) {
+    .auth-container {
+        padding: 30px 20px;
+        margin: 0 10px;
+    }
+    .auth-header h1 {
+        font-size: 1.8em;
+    }
+    .btn {
+        padding: 12px 25px;
+        font-size: 16px;
+    }
+}
